@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Asignar valor inicial
+#status="libreOff"
+
+# Verificar si PLAYER_EVENT es 'playing' o 'pause'
+#if [ "$PLAYER_EVENT" == "playing" ] || [ "$PLAYER_EVENT" == "paused" ]; then
+#    status="libreOn"
+#fi
+
+if [ "$PLAYER_EVENT" == "stopped" ]; then
+   systemctl --user restart librespot.service
+fi
+
+
+# Guardar el estado en el archivo
+#echo "$status" > magic-arduino/librestatus
