@@ -1,0 +1,104 @@
+#!/bin/bash
+
+VOLUME_CONTROL="Master"
+initial_volume=10
+duration=5
+ENV_FILE="$HOME/.librespot_tmp"
+
+# Cargar las variables de entorno si el archivo existe
+if [ -f "$ENV_FILE" ]; then
+  source "$ENV_FILE"
+  #echo "Las variables de entorno han sido cargadas desde $ENV_FILE."
+  # Validar que las variables no estén vacías
+  if [ -z "$final_volume" ]; then
+    export final_volume=100
+  fi
+
+  if [ -z "$isPlaying" ]; then
+    export isPlaying="false"
+  fi
+
+  if [ -z "$soundUpPid" ]; then
+    export soundUpPid=0
+  fi  
+else
+  # Si el archivo no existe, las definimos con valores predeterminados
+  export final_volume=100
+  export isPlaying="false"
+  export soundUpPid=0
+  #echo "Las variables de entorno no estaban definidas. Usando valores predeterminados."
+fi
+
+# Función de easing (ejemplo: easing cuadrático)
+easing() {
+  local t=$1   # tiempo actual
+  local b=$2   # volumen inicial
+  local c=$3   # cambio de volumen (final - inicial)
+  local d=$4   # duración
+
+  # Easing cuadrático: t/d * t
+  # echo $(bc -l <<< "$b + $c * (($t / $d) * ($t / $d))")
+  # Easing sinusoidal: 1 - cos(t / d * (pi / 2))
+  echo $(bc -l <<< "$b + $c * (1 - c(3.14159 * $t / (2 * $d)))")
+}
+
+# Función para subir el volumen con easing
+soundUp() {
+  start_time=$(date +%s)
+
+  while true; do
+    current_time=$(($(date +%s) - $start_time))
+
+    # Verificamos si hemos alcanzado la duración deseada
+    if [ $current_time -ge $duration ]; then
+      # Establecemos el volumen final
+      amixer sset "$VOLUME_CONTROL" $final_volume% >/dev/null 2>&1
+      break
+    fi
+
+    # Calculamos el volumen con la función de easing
+    eased_volume=$(easing $current_time $initial_volume $(($final_volume - $initial_volume)) $duration)
+
+    # Establecemos el volumen con amixer (eliminamos decimales)
+    amixer sset "$VOLUME_CONTROL" ${eased_volume%\.*}% >/dev/null 2>&1
+
+    # Esperamos un poco antes de la siguiente actualización
+    sleep 0.1
+  done
+}
+
+if [ "$PLAYER_EVENT" == "playing" ]; then
+   if [ "$isPlaying" == "false" ]; then
+      soundUp &
+      soundUpPid=$!    
+      isPlaying="true"
+   fi
+fi
+
+if [ "$PLAYER_EVENT" == "paused" ]; then
+   if [ $soundUpPid -gt 0 ] && kill -0 $soundUpPid 2>/dev/null; then
+      kill $soundUpPid
+      wait $soundUpPid 2>/dev/null  # Espera a que el proceso termine de matarse
+   else
+      final_volume=$(amixer get Master | grep -oP '\d+(?=%)' | head -n 1)
+   fi
+   soundUpPid=0   
+   sleep 0.2
+   amixer sset "$VOLUME_CONTROL" $initial_volume% >/dev/null 2>&1
+   isPlaying="false"
+fi
+
+if [ "$PLAYER_EVENT" == "stopped" ]; then
+   rm -f "$ENV_FILE"
+   systemctl --user restart librespot.service
+fi
+
+# Guardar las variables de entorno en el archivo
+rm -f "$ENV_FILE"
+echo "export final_volume=$final_volume" > "$ENV_FILE"
+echo "export isPlaying=$isPlaying" >> "$ENV_FILE"
+echo "export soundUpPid=$soundUpPid" >> "$ENV_FILE"
+
+#echo "Estado guardado en $ENV_FILE."
+# Guardar el estado en el archivo
+#echo "$status" > magic-arduino/librestatus
