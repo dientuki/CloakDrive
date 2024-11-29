@@ -2,8 +2,9 @@
 
 VOLUME_CONTROL="Master"
 initial_volume=10
-duration=5
+duration=4
 ENV_FILE="$HOME/.librespot_tmp"
+LOCK_FILE="$HOME/.cloackDevice"
 
 # Cargar las variables de entorno si el archivo existe
 if [ -f "$ENV_FILE" ]; then
@@ -69,8 +70,10 @@ soundUp() {
 
 if [ "$PLAYER_EVENT" == "playing" ]; then
    if [ "$isPlaying" == "false" ]; then
-      soundUp &
-      soundUpPid=$!    
+      if [ ! -e "$LOCK_FILE" ]; then
+        soundUp &
+        soundUpPid=$!    
+      fi   
       isPlaying="true"
    fi
 fi

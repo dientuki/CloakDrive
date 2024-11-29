@@ -4,6 +4,7 @@ SOUND="/proc/asound/card0/pcm0p/sub0/status"
 VOLUME_CONTROL="Master"
 DEVICE="/dev/ttyACM0"  # Cambia esto si tu puerto es diferente
 BAUD=9600
+LOCK_FILE="$HOME/.cloackDevice"
 
 initial_volume=0
 final_volume=100
@@ -36,6 +37,7 @@ easing() {
 # Función para subir el volumen con easing
 soundUp() {
   start_time=$(date +%s)
+  touch "$LOCK_FILE"
 
   while true; do
     current_time=$(($(date +%s) - $start_time))
@@ -56,6 +58,7 @@ soundUp() {
     # Esperamos un poco antes de la siguiente actualización
     sleep 0.1
   done
+  rm -f "$LOCK_FILE"
 }
 
 change_brightness() {
@@ -109,6 +112,7 @@ cleanup() {
   xrandr --output eDP-1 --brightness 1.0
   echo "L" > $DEVICE
   amixer sset "$VOLUME_CONTROL" $initial_volume% >/dev/null 2>&1
+  rm -f "$LOCK_FILE"
   #echo 'sali'
   exit 0
 }
@@ -132,7 +136,8 @@ while true; do
       else
         final_volume=$(amixer get Master | grep -oP '\d+(?=%)' | head -n 1)
       fi
-      soundUpPid=0    
+      soundUpPid=0
+      rm -f "$LOCK_FILE"
 
       echo "L" > $DEVICE
       amixer sset "$VOLUME_CONTROL" $initial_volume% >/dev/null 2>&1
